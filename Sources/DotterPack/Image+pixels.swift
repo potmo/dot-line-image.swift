@@ -28,12 +28,12 @@ struct Pixel {
 
 }
 
-struct MonochromePixelImage {
+struct PixelImage<T> {
     let width: Int
     let height: Int
-    var pixels: [Bool]
+    var pixels: [T]
 
-    subscript(x: Int, y: Int) -> Bool {
+    subscript(x: Int, y: Int) -> T {
         get {
             let index = getIndex(x,y)
             return pixels[index]
@@ -44,36 +44,7 @@ struct MonochromePixelImage {
         }
     }
 
-    private func getIndex(_ x: Int, _ y: Int) -> Int {
-        guard self.contains(x, y) else {
-            fatalError("\(x), \(y) is outside \(width), \(height)")
-        }
-
-        return y * width + x
-    }
-
-    func contains(_ x: Int, _ y: Int) -> Bool {
-        return (0 ..< width).contains(x) && (0 ..< height).contains(y)
-    }
-}
-
-struct PixelImage {
-    let width: Int
-    let height: Int
-    var pixels: [Pixel]
-
-    subscript(x: Int, y: Int) -> Pixel {
-        get {
-            let index = getIndex(x,y)
-            return pixels[index]
-        }
-        set(newValue) {
-            let index = getIndex(x,y)
-            pixels[index] = newValue
-        }
-    }
-
-    var matrix: [[Pixel]] {
+    var matrix: [[T]] {
         return stride(from: 0, to: width, by: 1).map{ x in
             return stride(from: 0, to: height, by: 1).map{ y in
                 return self[x, y]
@@ -94,23 +65,23 @@ struct PixelImage {
     }
 }
 
-extension PixelImage {
-    func monochromed() -> MonochromePixelImage {
+extension PixelImage where T == Pixel {
+    func monochromed() -> PixelImage<Bool> {
         let pixels = self.pixels.map{ $0.r == 0}
-        return MonochromePixelImage(width: width, height: height, pixels: pixels)
+        return PixelImage<Bool>(width: width, height: height, pixels: pixels)
     }
 }
 
-extension MonochromePixelImage {
-    func fullColored() -> PixelImage {
+extension PixelImage where T == Bool {
+    func fullColored() -> PixelImage<Pixel> {
         let pixels = self.pixels.map{ Pixel(a: 255, r: $0 ? 255 : 0, g: $0 ? 255 : 0, b: $0 ? 255 : 0)}
-        return PixelImage(width: width, height: height, pixels: pixels)
+        return PixelImage<Pixel>(width: width, height: height, pixels: pixels)
     }
 }
 
 
 extension PixelImage {
-    func rotatedCCW() -> PixelImage{
+    func rotatedCCW() -> PixelImage<T>{
 
         let n = width
         let x = Int(floor(Double(n) / 2))
@@ -134,7 +105,7 @@ extension PixelImage {
 }
 
 extension NSImage {
-    func pixelImage() -> PixelImage {
+    func pixelImage() -> PixelImage<Pixel> {
 
         guard let cgImage = self.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             fatalError("could not get CGImage")
@@ -170,12 +141,12 @@ extension NSImage {
 
         let pixels = rawPixels.map(Pixel.init)
 
-        return PixelImage(width: width, height: height, pixels: pixels)
+        return PixelImage<Pixel>(width: width, height: height, pixels: pixels)
 
     }
 }
 
-extension PixelImage {
+extension PixelImage where T == Pixel {
     func toImage() -> NSImage {
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue & CGBitmapInfo.alphaInfoMask.rawValue

@@ -1,6 +1,6 @@
 import Foundation
 
-extension PixelImage {
+extension PixelImage where T == Pixel {
 
     func luminances() -> [UInt8] {
         return pixels.map{ pixel in
@@ -17,11 +17,11 @@ extension PixelImage {
             return Pixel(a: 255, r: luminance, g: luminance, b: luminance)
         }
 
-        return PixelImage(width: width, height: height, pixels: newPixels)
+        return PixelImage<Pixel>(width: width, height: height, pixels: newPixels)
     }
 }
 
-extension PixelImage {
+extension PixelImage where T == Pixel {
     func thresholded(with threshold: UInt8) -> PixelImage {
 
         let pixels = self.luminances().map{ luminence in
@@ -34,7 +34,7 @@ extension PixelImage {
     }
 }
 
-extension PixelImage {
+extension PixelImage where T == Pixel {
     func bayerDithered(with threshold: UInt8) -> PixelImage {
         let thresholdMap: [[UInt8]] = [
             [15, 135, 45, 165],
@@ -55,7 +55,7 @@ extension PixelImage {
     }
 }
 
-extension PixelImage {
+extension PixelImage where T == Pixel{
     func floydSteinbergDithered() -> PixelImage {
         var luminances = self.luminances().map(Double.init)
 
@@ -79,7 +79,7 @@ extension PixelImage {
     }
 }
 
-extension PixelImage {
+extension PixelImage where T == Pixel {
     func atkinsonDithered() -> PixelImage {
         var luminances = self.luminances().map(Double.init)
 

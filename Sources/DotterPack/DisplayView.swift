@@ -8,13 +8,13 @@ class DisplayView: NSView {
 
     var parent: Display!
 
-    private let inputA: MonochromePixelImage
-    private let inputB: MonochromePixelImage
+    private let inputA: PixelImage<Bool>
+    private let inputB: PixelImage<Bool>
     private let found: [Pivot]
 
     private var showInput = true
 
-    init(parent: Display, inputA: PixelImage, inputB: PixelImage) {
+    init(parent: Display, inputA: PixelImage<Pixel>, inputB: PixelImage<Pixel>) {
         /*
         let aligner = PairwiseAlignment<Character>()
 
