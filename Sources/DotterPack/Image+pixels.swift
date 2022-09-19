@@ -26,9 +26,6 @@ struct Pixel {
         return UInt32(a) << 24 | UInt32(b) << 16 | UInt32(g) << 8 | UInt32(r)
     }
 
-
-
-
 }
 
 struct MonochromePixelImage {
@@ -73,6 +70,14 @@ struct PixelImage {
         set(newValue) {
             let index = getIndex(x,y)
             pixels[index] = newValue
+        }
+    }
+
+    var matrix: [[Pixel]] {
+        return stride(from: 0, to: width, by: 1).map{ x in
+            return stride(from: 0, to: height, by: 1).map{ y in
+                return self[x, y]
+            }
         }
     }
 

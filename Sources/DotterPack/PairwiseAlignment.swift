@@ -159,4 +159,30 @@ struct PairwiseAlignment<T: Equatable> {
         return rows.joined(separator: "\n")
     }
 
+
+    func computeDiagonalAlignments(matrix1: [[T]], matrix2: [[T]]) -> [([T?], [T?])] {
+
+        let width = matrix1.count
+        let height = matrix1[0].count
+
+        // iterate over the matrix diagonally (from top left, right up diagonal)
+        var alignedDiagonals: [([T?], [T?])] = []
+        for k in 0 ..< (width + height - 2) {
+            var diagonal1:[T] = []
+            var diagonal2:[T] = []
+            for j in 0 ..< k {
+                let i = k - j;
+                if( i < height && j < width ) {
+                    diagonal1.append(matrix1[i][j])
+                    diagonal2.append(matrix2[i][j])
+                }
+            }
+
+            let alignment = computeAlignment(s1: diagonal1, s2: diagonal2)
+            alignedDiagonals.append(alignment)
+        }
+
+        return alignedDiagonals
+    }
+
 }
