@@ -167,10 +167,13 @@ struct PairwiseAlignment<T: Equatable> {
 
         // iterate over the matrix diagonally (from top left, right up diagonal)
         var alignedDiagonals: [([T?], [T?])] = []
-        for k in 0 ..< (width + height - 2) {
+        alignedDiagonals.reserveCapacity(width + height)
+        for k in 0 ... (width + height - 2) {
             var diagonal1:[T] = []
             var diagonal2:[T] = []
-            for j in 0 ..< k {
+            diagonal1.reserveCapacity(k)
+            diagonal2.reserveCapacity(k)
+            for j in 0 ... k {
                 let i = k - j;
                 if( i < height && j < width ) {
                     diagonal1.append(matrix1[i][j])

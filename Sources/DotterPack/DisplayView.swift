@@ -12,43 +12,28 @@ class DisplayView: NSView {
     private let inputB: PixelImage<Bool>
     private let found: [Pivot]
 
-    private var showInput = true
+    private var showInput = false
 
     init(parent: Display, inputA: PixelImage<Pixel>, inputB: PixelImage<Pixel>) {
-        /*
-        let aligner = PairwiseAlignment<Character>()
-
-        let sequence1 = Array("10000010000100000001")
-        let sequence2 = Array("10001000100010000010")
-
-        let directMatches = aligner.computeDirectMatches(s1: sequence1, s2: sequence2)
-        let scored = aligner.computeScoredData(s1: sequence1, s2: sequence2)
-
-        print(aligner.stringify(s1: sequence1, s2: sequence2, data: directMatches))
-        print(sequence1.map{_ in "---"}.joined())
-        print(aligner.stringify(s1: sequence1, s2: sequence2, data: scored))
-        let (aligned1, aligned2) = aligner.computeAlignment(s1: sequence1, s2: sequence2)
-        print(aligned1.map{ $0 == nil ? "-" : "\($0!)"}.joined())
-        print(aligned2.map{ $0 == nil ? "-" : "\($0!)"}.joined())*/
-
 
         var inputA = inputA.floydSteinbergDithered().monochromed()
         var inputB = inputB.floydSteinbergDithered().rotatedCCW().monochromed()
         let aligner = PairwiseAlignment<Bool>()
 
-        var sequenceA: [Bool] = []
-        var sequenceB: [Bool] = []
-        for i in 0 ..< inputA.width {
-            let aPixel = inputA[i, inputA.height - i - 1]
-            let bPixel = inputB[i, inputB.height - i - 1]
 
-            sequenceA.append(aPixel)
-            sequenceB.append(bPixel)
+        Task{
+            print("start")
+            let matrix1 = inputA.matrix
+            let matrix2 = inputB.matrix
+            print("matrix done")
+            let result = aligner.computeDiagonalAlignments(matrix1: matrix1, matrix2: matrix2)
+            print("done")
         }
 
-        let (alignmentA, alignmentB) = aligner.computeAlignment(s1: sequenceA, s2: sequenceB)
-        print(alignmentA.map{ $0 == nil ? "-" : "\($0! ? 1 : 0)"}.joined())
-        print(alignmentB.map{ $0 == nil ? "-" : "\($0! ? 1 : 0)"}.joined())
+
+
+        //print(alignmentA.map{ $0 == nil ? "-" : "\($0! ? 1 : 0)"}.joined())
+        //print(alignmentB.map{ $0 == nil ? "-" : "\($0! ? 1 : 0)"}.joined())
 
 
         self.inputA = inputA
