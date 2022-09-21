@@ -8,77 +8,134 @@ class DisplayView: NSView {
 
     var parent: Display!
 
-    private let inputA: PixelImage<Bool>
-    private let inputB: PixelImage<Bool>
-    private let found: [Pivot]
+    private let inputA: PixelImage<LabeledBool>
+    private let inputB: PixelImage<LabeledBool>
+    private var found: [Pivot]
 
     private var showInput = false
 
     init(parent: Display, inputA: PixelImage<Pixel>, inputB: PixelImage<Pixel>) {
 
-        var inputA = inputA.floydSteinbergDithered().monochromed()
-        var inputB = inputB.floydSteinbergDithered().rotatedCCW().monochromed()
-        let aligner = PairwiseAlignment<Bool>()
+        self.found = []
 
+        let imageA = inputA.floydSteinbergDithered().monochromed().labeled()
+        let imageB = inputB.floydSteinbergDithered().rotatedCCW().monochromed().labeled()
+        let aligner = PairwiseAlignment<LabeledBool>()
 
-        Task{
-            print("start")
-            let matrix1 = inputA.matrix
-            let matrix2 = inputB.matrix
-            print("matrix done")
-            let result = aligner.computeDiagonalAlignments(matrix1: matrix1, matrix2: matrix2)
-            print("done")
-        }
-
-
-
-        //print(alignmentA.map{ $0 == nil ? "-" : "\($0! ? 1 : 0)"}.joined())
-        //print(alignmentB.map{ $0 == nil ? "-" : "\($0! ? 1 : 0)"}.joined())
-
-
-        self.inputA = inputA
-        self.inputB = inputB
-
-
-        var found: [Pivot] = []
-
-        // find direct hits
-        for x in 0..<inputA.width {
-            for y in 0..<inputA.height {
-                if inputA[x,y] && inputB[x, y] {
-                    inputA[x,y] = false
-                    inputB[x,y] = false
-                    found.append(Pivot(x: x, y: y, length: 0))
-                }
-            }
-        }
-
-        let maxDiagonal = Int((sqrt(pow(Double(inputA.width),2) + pow(Double(inputA.height),2))).rounded(.up))
-
-        for x in 0..<inputA.width {
-            for y in 0..<inputA.height {
-                if inputA[x,y] {
-                    for d in 0 ..< maxDiagonal {
-                        guard inputB.contains(x+d, y-d) else {
-                            break
-                        }
-                        if inputB[x+d, y-d] {
-                            found.append(Pivot(x: x, y: y-d, length: d))
-                            inputA[x,y] = false
-                            inputB[x+d,y-d] = false
-                            break
-                        }
-                    }
-                }
-            }
-        }
-
-
-        self.found = found
         
+        var generator = RandomNumberGeneratorWithSeed(seed: 1234)
 
+        self.inputA = PixelImage<LabeledBool>(width: 5, height: 5, pixels: stride(from: 0, to: 5, by: 1).map{ x in
+            return stride(from: 0, to: 5, by: 1).map{ y in
+                return LabeledBool(x: x, y: y, value: Bool.random(using: &generator)) // Bool.random(using: &generator)
+            }
+        }.flatMap{$0})
+
+
+        self.inputB = PixelImage<LabeledBool>(width: 5, height: 5, pixels: stride(from: 0, to: 5, by: 1).map{ x in
+            return stride(from: 0, to: 5, by: 1).map{ y in
+                return LabeledBool(x: x, y: y, value: Bool.random(using: &generator)) // Bool.random(using: &generator)
+            }
+        }.flatMap{$0})
 
         super.init(frame: NSRect(x: 0, y: 0, width: 1000, height: 1000))
+
+
+        print("inputA")
+        printMatrix(self.inputA.matrix) { $0.value ? "■" : "□"}
+
+        print("inputB")
+        printMatrix(self.inputB.matrix) { $0.value ? "■" : "□"}
+
+        print("//////////")
+
+        Task{
+            let diagonalsA = self.inputA.diagonals
+            let diagonalsB = self.inputB.diagonals
+
+            let alignments = await zip(diagonalsA, diagonalsB)
+                .asyncMap{ diagonalA, diagonalB in
+                    let alignment = await aligner.computeAlignment(s1: diagonalA, s2: diagonalB)
+                    return alignment
+                }
+
+            printAlignments(of: alignments, diagonalsA: diagonalsA, diagonalsB: diagonalsB)
+
+            // find all pixels that match after aligning
+            let nonMathingAlignments = alignments.map{ (alignment: ([LabeledBool?], [LabeledBool?])) -> ([LabeledBool?], [LabeledBool?]) in
+
+                var (newAlignedA, newAlignedB) = alignment
+
+                for i in newAlignedA.indices {
+                    guard let pixelA = newAlignedA[i], let pixelB = newAlignedB[i] else {
+                        continue
+                    }
+
+                    if pixelA.alignsWith(pixelB) {
+                        let pivot = Pivot(x: pixelA.x, y: pixelB.y, length: abs(pixelA.y - pixelB.y))
+                        self.found.append(pivot)
+
+                        if !pixelA.value || !pixelB.value {
+                            fatalError("Boom")
+                        }
+
+                        newAlignedA[i] = nil
+                        newAlignedB[i] = nil
+                    }
+                }
+
+                return (newAlignedA, newAlignedB)
+            }
+
+
+            print("XXXXXXXXXXXX After XXXXXXXXXXXX")
+            printAlignments(of: nonMathingAlignments, diagonalsA: diagonalsA, diagonalsB: diagonalsB)
+
+        }
+
+/*
+        let sequence = aligner.diagonalAlignmentIterator(matrix1: self.inputA.matrix, matrix2: self.inputB.matrix)
+
+        Task{
+            for try await alignment in sequence {
+
+                printArray(alignment.0){ val in
+                    guard let val else {
+                        return "-"
+                    }
+                    return val.value ? "■" : "□"
+                }
+
+                print(alignment.0.compactMap{ $0 }.map{ "(\($0.x),\($0.y))"}.joined())
+
+                printArray(alignment.1){ val in
+                    guard let val else {
+                        return "-"
+                    }
+                    return val.value ? "■" : "□"
+                }
+
+                print(alignment.1.compactMap{ $0 }.map{ "(\($0.x),\($0.y))"}.joined())
+
+                print("//////////////")
+
+                zip(alignment.0, alignment.1)
+                    .map{ label1, label2 -> (LabeledBool, LabeledBool)? in
+                    guard let label1, let label2, label1.value, label2.value else {
+                        return nil
+                    }
+                    return (label1, label2)
+                }
+                .compactMap{$0}
+                .forEach{ label1, label2 in
+                    let pivot = Pivot(x: label1.x, y: label2.y, length: abs(label1.y - label2.y))
+                    self.found.append(pivot)
+                }
+
+            }
+        }
+
+*/
     }
 
 
@@ -121,7 +178,7 @@ class DisplayView: NSView {
             
             for x in 0 ..< inputA.width {
                 for y in 0 ..< inputA.height {
-                    if inputA[x,y] {
+                    if inputA[x,y].value {
                         context.beginPath()
                         context.addArc(center: (offset + Point(x,y) * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi*2, clockwise: true)
                         context.strokePath()
@@ -134,7 +191,7 @@ class DisplayView: NSView {
             
             for x in 0 ..< inputB.width {
                 for y in 0 ..< inputB.height {
-                    if inputB[x, y]   {
+                    if inputB[x, y].value   {
                         context.beginPath()
                         let point = offset + Point(x,y) * scale
                         context.addArc(center: point.cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi*2, clockwise: true)
@@ -191,7 +248,60 @@ class DisplayView: NSView {
 
     }
 
-   
+    func printMatrix<T>(_ matrix: [[T]], printer: (T)->String) {
+        for row in matrix {
+            printArray(row, printer: printer)
+        }
+    }
+
+    func printArray<T>(_ array: [T], printer: (T) -> String) {
+        print(array.map(printer).joined())
+    }
+
+    func toTrueFalseNil(_ val: Bool?, _ trueString: String, _ falseString: String, _ nilString: String) -> String {
+        guard let val else {
+            return nilString
+        }
+        return val ? trueString : falseString
+    }
+
+    func printAlignments(of alignments: [([LabeledBool?], [LabeledBool?])], diagonalsA: [[LabeledBool]], diagonalsB: [[LabeledBool]]) {
+        stride(from: 0, to: alignments.count, by: 1).forEach{ i in
+            let diagonalA = diagonalsA[i]
+            let diagonalB = diagonalsB[i]
+            let alignment = alignments[i]
+
+            printArray(diagonalA){ $0.value ? "■" : "□"}
+            printArray(diagonalB){ $0.value ? "■" : "□"}
+
+            printArray(diagonalA){ "(\($0.x),\($0.y))"}
+            printArray(diagonalB){ "(\($0.x),\($0.y))"}
+
+            printArray(alignment.0){ toTrueFalseNil($0?.value, "■", "□", "-") }
+            printArray(alignment.1){ toTrueFalseNil($0?.value, "■", "□", "-") }
+
+
+            let alignmentStrings = zip(alignment.0, alignment.1).map{ tup in
+                if let a1 = tup.0, let a2 = tup.1 {
+                    return ("(\(a1.x),\(a1.y))", "(\(a2.x),\(a2.y))")
+                } else if let a1 = tup.0 {
+                    let s = "(\(a1.x),\(a1.y))"
+                    return (s, Array(repeating: "-", count: s.count).joined())
+                } else if let a2 = tup.1 {
+                    let s = "(\(a2.x),\(a2.y))"
+                    return (Array(repeating: "-", count: s.count).joined(), s)
+                } else {
+                    return ("-", "-")
+                }
+            }.unzip()
+
+            print(alignmentStrings.0.joined())
+            print(alignmentStrings.1.joined())
+
+            print("/////////////////////////")
+
+        }
+    }
 
 
     override func updateTrackingAreas() {

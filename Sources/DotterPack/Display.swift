@@ -14,8 +14,8 @@ struct Display: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> DisplayView {
-        let inputA = loadImage(name: "bergman").pixelImage()
-        let inputB = loadImage(name: "persson").pixelImage()
+        let inputA = loadImage(name: "wow-black").pixelImage()
+        let inputB = loadImage(name: "wow-cool-black").pixelImage()
         let view = DisplayView(parent: self, inputA: inputA, inputB: inputB)
         return view
     }

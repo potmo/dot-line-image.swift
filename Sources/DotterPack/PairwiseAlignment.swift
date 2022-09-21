@@ -1,88 +1,96 @@
 import Foundation
 
-struct PairwiseAlignment<T: Equatable> {
+struct PairwiseAlignment<T: Alignable> {
 
     // adapted from: https://github.com/preston/alignment
     // propbably https://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm without gap opening and gap extension penanlties
 
-    func computeAlignment(s1: [T], s2: [T]) -> ([T?], [T?]) {
-        let trace = computeScoredData(s1: s1, s2: s2)
+    func computeAlignment(s1: [T], s2: [T]) async -> ([T?], [T?]) {
+        let trace = await computeScoredData(s1: s1, s2: s2)
 
         let rows = trace[0].count;
         let cols = trace.count;
 
-        var output1: [T?] = []
-        var output2: [T?] = []
+        let gapExtensionCost = 0
 
-        var curX: Int = 0
-        var curY: Int = 0
+        let task = Task {
 
-        while curX < cols && curY < rows {
-            var best = -1
-            var bestX = curX
-            var bestY = curY
-            for y in curY ..< rows {
-                if s2[y] == s1[curX] && trace[curX][y] > best {
-                    best = trace[curX][y]
-                    bestX = curX
-                    bestY = y
-                }
-            }
-            for x in curX ..< cols {
-                if(s2[curY] == s1[x] && trace[x][curY] > best) {
-                    best = trace[x][curY]
-                    bestX = x
-                    bestY = curY
-                }
-            }
-            if best >= 0 {
+            var output1: [T?] = []
+            var output2: [T?] = []
 
-                let diffX = bestX - curX;
-                let diffY = bestY - curY;
-                output1.append(contentsOf: Array<T?>(repeating: nil, count: diffY))
-                output2.append(contentsOf: Array<T?>(repeating: nil, count: diffX))
+            var curX: Int = 0
+            var curY: Int = 0
 
-                for i in 0 ..< diffX {
-                    if curX + i > cols {
-                        break
+            while curX < cols && curY < rows {
+                var best = -1
+                var bestX = curX
+                var bestY = curY
+                for y in curY ..< rows {
+                    if s2[y].alignsWith(s1[curX]) && trace[curX][y] - max(0, (y - curY) * gapExtensionCost) > best {
+                        best = trace[curX][y]
+                        bestX = curX
+                        bestY = y
                     }
-                    output1.append(s1[curX + i])
                 }
-
-                for i in 0 ..< diffY {
-                    if curY + i > rows {
-                        break
+                for x in curX ..< cols {
+                    if(s2[curY].alignsWith(s1[x]) && trace[x][curY] - max(0, (x - curX) * gapExtensionCost) > best) {
+                        best = trace[x][curY]
+                        bestX = x
+                        bestY = curY
                     }
-                    output2.append(s2[curY + i])
                 }
+                if best >= 0 {
 
-                output1.append(s1[bestX])
-                output2.append(s2[bestY])
+                    let diffX = bestX - curX;
+                    let diffY = bestY - curY;
+                    output1.append(contentsOf: Array<T?>(repeating: nil, count: diffY))
+                    output2.append(contentsOf: Array<T?>(repeating: nil, count: diffX))
 
-            } else {
-                output1.append(nil)
+                    for i in 0 ..< diffX {
+                        if curX + i > cols {
+                            break
+                        }
+                        output1.append(s1[curX + i])
+                    }
+
+                    for i in 0 ..< diffY {
+                        if curY + i > rows {
+                            break
+                        }
+                        output2.append(s2[curY + i])
+                    }
+
+                    output1.append(s1[bestX])
+                    output2.append(s2[bestY])
+
+                } else {
+                    output1.append(nil)
+                    output2.append(nil)
+                }
+                curX = bestX + 1
+                curY = bestY + 1
+            }
+
+            // Add whatever crap is left over.
+            for  i in curX ..< cols {
+                output1.append(s1[i])
                 output2.append(nil)
+
             }
-            curX = bestX + 1
-            curY = bestY + 1
-        }
-        // Add whatever crap is left over.
-        for  i in curX ..< cols {
-            output1.append(s1[i])
-            output2.append(nil)
+            for i in curY ..< rows {
+                output1.append(nil)
+                output2.append(s2[i])
+            }
 
-        }
-        for i in curY ..< rows {
-            output1.append(nil)
-            output2.append(s2[i])
+            return (output1, output2)
         }
 
-        return (output1, output2)
+        return await task.value
 
     }
 
-    func computeScoredData(s1: [T], s2: [T]) -> [[Int]] {
-        let data = computeDirectMatches(s1: s1, s2: s2)
+    func computeScoredData(s1: [T], s2: [T]) async -> [[Int]] {
+        let data = await computeDirectMatches(s1: s1, s2: s2)
 
         let rows = data[0].count
         let cols = data.count
@@ -123,14 +131,14 @@ struct PairwiseAlignment<T: Equatable> {
 
 
     // generate list of direct matches
-    func computeDirectMatches(s1: [T], s2: [T]) -> [[Int]] {
+    func computeDirectMatches(s1: [T], s2: [T]) async -> [[Int]] {
         let columns = s1.count
         let rows = s2.count
         var data = Array(repeating: Array(repeating: 0, count: rows), count: columns)
 
         for y in 0 ..< rows {
             for x in 0 ..< columns {
-                if s1[x] == s2[y] {
+                if s1[x].alignsWith(s2[y]) {
                     data[x][y] = 1
                 } else {
                     data[x][y] = 0
@@ -160,32 +168,8 @@ struct PairwiseAlignment<T: Equatable> {
     }
 
 
-    func computeDiagonalAlignments(matrix1: [[T]], matrix2: [[T]]) -> [([T?], [T?])] {
+}
 
-        let width = matrix1.count
-        let height = matrix1[0].count
-
-        // iterate over the matrix diagonally (from top left, right up diagonal)
-        var alignedDiagonals: [([T?], [T?])] = []
-        alignedDiagonals.reserveCapacity(width + height)
-        for k in 0 ... (width + height - 2) {
-            var diagonal1:[T] = []
-            var diagonal2:[T] = []
-            diagonal1.reserveCapacity(k)
-            diagonal2.reserveCapacity(k)
-            for j in 0 ... k {
-                let i = k - j;
-                if( i < height && j < width ) {
-                    diagonal1.append(matrix1[i][j])
-                    diagonal2.append(matrix2[i][j])
-                }
-            }
-
-            let alignment = computeAlignment(s1: diagonal1, s2: diagonal2)
-            alignedDiagonals.append(alignment)
-        }
-
-        return alignedDiagonals
-    }
-
+protocol Alignable {
+    func alignsWith(_ other: Self) -> Bool
 }

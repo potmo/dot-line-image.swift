@@ -52,12 +52,39 @@ struct PixelImage<T> {
         }
     }
 
+    var diagonals: [[T]] {
+        var diagonals: [[T]] = []
+        diagonals.reserveCapacity(width + height - 2)
+        let matrix = self.matrix
+
+        for k in 0 ... (width + height - 2) {
+            var diagonal:[T] = []
+            diagonal.reserveCapacity(k)
+            for j in 0 ... k {
+                let i = k - j;
+                if( i < height && j < width ) {
+                    diagonal.append(matrix[i][j])
+                }
+            }
+
+            diagonals.append(diagonal)
+        }
+
+        return diagonals
+    }
+
     private func getIndex(_ x: Int, _ y: Int) -> Int {
         guard  self.contains(x, y) else {
             fatalError("\(x), \(y) is outside \(width), \(height)")
         }
 
         return y * width + x
+    }
+
+    private func getCoordinate(from index: Int) -> (x: Int, y: Int) {
+        let x = index % width
+        let y = index / width
+        return (x: x, y: y)
     }
 
     func contains(_ x: Int, _ y: Int) -> Bool {
@@ -73,9 +100,32 @@ extension PixelImage where T == Pixel {
 }
 
 extension PixelImage where T == Bool {
-    func fullColored() -> PixelImage<Pixel> {
-        let pixels = self.pixels.map{ Pixel(a: 255, r: $0 ? 255 : 0, g: $0 ? 255 : 0, b: $0 ? 255 : 0)}
-        return PixelImage<Pixel>(width: width, height: height, pixels: pixels)
+    func labeled() -> PixelImage<LabeledBool> {
+        let pixels = self.pixels.enumerated().map{ index, value in
+            let (x, y) = self.getCoordinate(from: index)
+            return LabeledBool(x: x, y: y, value: value)
+        }
+        return PixelImage<LabeledBool>(width: width, height: height, pixels: pixels)
+    }
+}
+
+extension PixelImage where T == Bool {
+
+}
+
+struct LabeledBool: Equatable, Alignable {
+
+
+    let x: Int
+    let y: Int
+    let value: Bool
+
+    static func == (lhs: LabeledBool, rhs: LabeledBool) -> Bool {
+        return lhs.value == rhs.value
+    }
+
+    func alignsWith(_ other: LabeledBool) -> Bool {
+        return self.value && other.value
     }
 }
 
