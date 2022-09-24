@@ -7,14 +7,33 @@ class ThingUsingAnimations {
         let animator = Animator()
 
         animator.enqueueSequence{
-            LinearTransition(duration: 10, from: [1,2,3], to: [0,0,0])
-            LinearTransition(duration: 20, from: [1,1,1], to: [2,2,2])
+            LinearTranslation(duration: 10, from: [1,2,3], to: [0,0,0])
+            LinearTranslation(duration: 20, from: [1,1,1], to: [2,2,2])
 
+            LinearTranslation(duration: 10, from: { [1,1,1] }, to: { [1,2,3] })
             Delay(duration: 10)
 
             InParallel{
-                LinearTransition(duration: 10, from: [0,0,0], to: [1,1,1])
-                LinearTransition(duration: 10, from: [0,0,0], to: [1,1,1])
+                LinearTranslation(duration: 10, from: [0,0,0], to: [1,1,1])
+                LinearRotation(duration: 10, from: { simd_quatf() }, to: { simd_quatf() })
+
+                InSequence{
+                    LinearTranslation(duration: 10, from: [1,2,3], to: [1,2,3])
+                    LinearRotation(duration: 10, from: { simd_quatf() }, to: { simd_quatf() })
+                    LinearTranslation(duration: 10, from: [1,2,3], to: [1,2,3])
+                }
+            }
+
+            if true {
+                LinearTranslation(duration: 10, from: [1,2,3], to: [1,2,3])
+            }
+
+            While{
+                return true
+            }
+
+            Call{
+                print("All done")
             }
         }
 

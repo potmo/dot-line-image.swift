@@ -11,32 +11,34 @@ class DisplayView: NSView {
     private let inputA: PixelImage<LabeledBool>
     private let inputB: PixelImage<LabeledBool>
     private var found: [Pivot]
+    private var strayPixelsA: [LabeledBool]
+    private var strayPixelsB: [LabeledBool]
 
     private var showInput = false
 
     init(parent: Display, inputA: PixelImage<Pixel>, inputB: PixelImage<Pixel>) {
 
         self.found = []
+        self.strayPixelsA = []
+        self.strayPixelsB = []
+        self.inputA = inputA.floydSteinbergDithered().monochromed().labeled()
+        self.inputB = inputB.floydSteinbergDithered().rotatedCCW().monochromed().labeled()
 
-        let imageA = inputA.floydSteinbergDithered().monochromed().labeled()
-        let imageB = inputB.floydSteinbergDithered().rotatedCCW().monochromed().labeled()
-        let aligner = PairwiseAlignment<LabeledBool>()
+        /*
+        var generator = RandomNumberGeneratorWithSeed(seed: 23232)
 
-        
-        var generator = RandomNumberGeneratorWithSeed(seed: 1234)
-
-        self.inputA = PixelImage<LabeledBool>(width: 5, height: 5, pixels: stride(from: 0, to: 5, by: 1).map{ x in
-            return stride(from: 0, to: 5, by: 1).map{ y in
+        self.inputA = PixelImage<LabeledBool>(width: 10, height: 10, pixels: stride(from: 0, to: 10, by: 1).map{ x in
+            return stride(from: 0, to: 10, by: 1).map{ y in
                 return LabeledBool(x: x, y: y, value: Bool.random(using: &generator)) // Bool.random(using: &generator)
             }
         }.flatMap{$0})
 
 
-        self.inputB = PixelImage<LabeledBool>(width: 5, height: 5, pixels: stride(from: 0, to: 5, by: 1).map{ x in
-            return stride(from: 0, to: 5, by: 1).map{ y in
+        self.inputB = PixelImage<LabeledBool>(width: 10, height: 10, pixels: stride(from: 0, to: 10, by: 1).map{ x in
+            return stride(from: 0, to: 10, by: 1).map{ y in
                 return LabeledBool(x: x, y: y, value: Bool.random(using: &generator)) // Bool.random(using: &generator)
             }
-        }.flatMap{$0})
+        }.flatMap{$0})*/
 
         super.init(frame: NSRect(x: 0, y: 0, width: 1000, height: 1000))
 
@@ -50,92 +52,96 @@ class DisplayView: NSView {
         print("//////////")
 
         Task{
-            let diagonalsA = self.inputA.diagonals
-            let diagonalsB = self.inputB.diagonals
 
-            let alignments = await zip(diagonalsA, diagonalsB)
-                .asyncMap{ diagonalA, diagonalB in
-                    let alignment = await aligner.computeAlignment(s1: diagonalA, s2: diagonalB)
-                    return alignment
-                }
+            let startDiagonalsA = self.inputA.diagonals
+            let startDiagonalsB = self.inputB.diagonals
 
-            printAlignments(of: alignments, diagonalsA: diagonalsA, diagonalsB: diagonalsB)
+            //first take all direct hits and add them as pivots
+            let (diagonalsA, diagonalsB) = await self.getDiagonalsWithoutDirectHits(startDiagonalsA: startDiagonalsA, startDiagonalsB: startDiagonalsB)
+
+            let alignments = await self.getAlignments(diagonalsA: diagonalsA, diagonalsB: diagonalsB)
+
+            //printAlignments(of: alignments, diagonalsA: diagonalsA, diagonalsB: diagonalsB)
 
             // find all pixels that match after aligning
-            let nonMathingAlignments = alignments.map{ (alignment: ([LabeledBool?], [LabeledBool?])) -> ([LabeledBool?], [LabeledBool?]) in
+            _ = await self.getNonMatchingAlignments(alignments: alignments)
 
-                var (newAlignedA, newAlignedB) = alignment
+            //print("XXXXXXXXXXXX After XXXXXXXXXXXX")
+            //printAlignments(of: nonMathingAlignments, diagonalsA: diagonalsA, diagonalsB: diagonalsB)
 
-                for i in newAlignedA.indices {
-                    guard let pixelA = newAlignedA[i], let pixelB = newAlignedB[i] else {
-                        continue
-                    }
+            (strayPixelsA, strayPixelsB) = await self.getStrayPixels(startDiagonalsA: startDiagonalsA, startDiagonalsB: startDiagonalsB)
 
+        }
+    }
+
+    func getDiagonalsWithoutDirectHits(startDiagonalsA: [[LabeledBool]], startDiagonalsB: [[LabeledBool]]) async -> ([[LabeledBool]], [[LabeledBool]]) {
+        return zip(startDiagonalsA, startDiagonalsB)
+            .map{ diagonalA, diagonalB in
+                return zip(diagonalA, diagonalB).map{ (pixelA, pixelB) -> (LabeledBool, LabeledBool) in
                     if pixelA.alignsWith(pixelB) {
-                        let pivot = Pivot(x: pixelA.x, y: pixelB.y, length: abs(pixelA.y - pixelB.y))
-                        self.found.append(pivot)
-
-                        if !pixelA.value || !pixelB.value {
-                            fatalError("Boom")
-                        }
-
-                        newAlignedA[i] = nil
-                        newAlignedB[i] = nil
+                        self.found.append(Pivot(pixelA, pixelB))
+                        // return empty pixel
+                        return (LabeledBool(x: pixelA.x, y: pixelA.y, value: false),
+                                LabeledBool(x: pixelB.x, y: pixelB.y, value: false))
                     }
+                    // return pixels as is
+                    return (pixelA, pixelB)
+                }.unzip()
+            }.unzip()
+    }
+
+    func getAlignments(diagonalsA: [[LabeledBool]], diagonalsB: [[LabeledBool]]) async -> [([LabeledBool?], [LabeledBool?])] {
+        let aligner = PairwiseAlignment<LabeledBool>()
+
+        return await zip(diagonalsA, diagonalsB)
+            .asyncMap{ diagonalA, diagonalB in
+                let alignment = await aligner.computeAlignment(s1: diagonalA, s2: diagonalB)
+                return alignment
+            }
+    }
+
+    func getNonMatchingAlignments(alignments: [([LabeledBool?], [LabeledBool?])]) async ->  [([LabeledBool?], [LabeledBool?])]{
+        return alignments.map{ (alignment: ([LabeledBool?], [LabeledBool?])) -> ([LabeledBool?], [LabeledBool?]) in
+
+            var (newAlignedA, newAlignedB) = alignment
+
+            for i in newAlignedA.indices {
+                guard let pixelA = newAlignedA[i], let pixelB = newAlignedB[i] else {
+                    continue
                 }
 
-                return (newAlignedA, newAlignedB)
+                if pixelA.alignsWith(pixelB) {
+                    self.found.append(Pivot(pixelA, pixelB))
+
+                    // remove the found one
+                    newAlignedA[i] = nil
+                    newAlignedB[i] = nil
+                }
             }
 
-
-            print("XXXXXXXXXXXX After XXXXXXXXXXXX")
-            printAlignments(of: nonMathingAlignments, diagonalsA: diagonalsA, diagonalsB: diagonalsB)
-
+            return (newAlignedA, newAlignedB)
         }
+    }
 
-/*
-        let sequence = aligner.diagonalAlignmentIterator(matrix1: self.inputA.matrix, matrix2: self.inputB.matrix)
-
-        Task{
-            for try await alignment in sequence {
-
-                printArray(alignment.0){ val in
-                    guard let val else {
-                        return "-"
-                    }
-                    return val.value ? "■" : "□"
-                }
-
-                print(alignment.0.compactMap{ $0 }.map{ "(\($0.x),\($0.y))"}.joined())
-
-                printArray(alignment.1){ val in
-                    guard let val else {
-                        return "-"
-                    }
-                    return val.value ? "■" : "□"
-                }
-
-                print(alignment.1.compactMap{ $0 }.map{ "(\($0.x),\($0.y))"}.joined())
-
-                print("//////////////")
-
-                zip(alignment.0, alignment.1)
-                    .map{ label1, label2 -> (LabeledBool, LabeledBool)? in
-                    guard let label1, let label2, label1.value, label2.value else {
-                        return nil
-                    }
-                    return (label1, label2)
-                }
-                .compactMap{$0}
-                .forEach{ label1, label2 in
-                    let pivot = Pivot(x: label1.x, y: label2.y, length: abs(label1.y - label2.y))
-                    self.found.append(pivot)
-                }
-
+    func getStrayPixels(startDiagonalsA: [[LabeledBool]], startDiagonalsB: [[LabeledBool]]) async -> ([LabeledBool], [LabeledBool]) {
+        let pixelsA = startDiagonalsA.flatMap{$0}
+        let blackPixelsA = pixelsA.filter{pixel in return pixel.value}
+        let strayPixelsA = blackPixelsA.filter{ pixel in
+                return !found.contains(where: { pivot in
+                    Int(pivot.posA.x) == pixel.x && Int(pivot.posA.y) == pixel.y
+                })
             }
+
+        let pixelsB = startDiagonalsB.flatMap{$0}
+        let blackPixelsB = pixelsB.filter{pixel in return pixel.value}
+        let strayPixelsB = blackPixelsB.filter{ pixel in
+            return !found.contains(where: { pivot in
+                Int(pivot.posB.x) == pixel.x && Int(pivot.posB.y) == pixel.y
+            })
         }
 
-*/
+
+        return (strayPixelsA, strayPixelsB)
     }
 
 
@@ -171,33 +177,69 @@ class DisplayView: NSView {
 
 
         let scale: Double = 6
-        let offset = Point(100, 200)
+        let inputSize:CGFloat = 5
+        let offset = Point( Double(self.bounds.midX), Double(self.bounds.midX)) - Point(inputA.width, inputA.height) / 2 * scale
+        let center = offset + Point(inputA.width, inputA.height) / 2 * scale
 
         if showInput {
-            context.setStrokeColor(CGColor(red: 0, green: 0, blue: 1, alpha: 1.0))
+            context.setFillColor(CGColor(red: 0, green: 0, blue: 1, alpha: 1.0))
             
             for x in 0 ..< inputA.width {
                 for y in 0 ..< inputA.height {
                     if inputA[x,y].value {
                         context.beginPath()
-                        context.addArc(center: (offset + Point(x,y) * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi*2, clockwise: true)
-                        context.strokePath()
+                        context.addArc(center: (offset + Point(x,y) * scale).cgPoint,
+                                       radius: inputSize,
+                                       startAngle: CGFloat.pi * 0.0,
+                                       endAngle: CGFloat.pi * 1.0,
+                                       clockwise: false)
+                        context.fillPath()
                     }
                 }
             }
+
+            context.setFillColor(CGColor(red: 1, green: 0, blue: 1, alpha: 1.0))
+            for strayPixel in strayPixelsA {
+
+                context.beginPath()
+                context.addArc(center: (offset + Point(strayPixel.x,strayPixel.y) * scale).cgPoint,
+                               radius: inputSize,
+                               startAngle: CGFloat.pi * 0.5,
+                               endAngle: CGFloat.pi * 1.0,
+                               clockwise: false)
+                context.addLine(to: (offset + Point(strayPixel.x,strayPixel.y) * scale).cgPoint)
+                context.fillPath()
+            }
             
-            
-            context.setStrokeColor(CGColor(red: 0, green: 1, blue: 0, alpha: 1.0))
+            context.setFillColor(CGColor(red: 0, green: 1, blue: 0, alpha: 1.0))
             
             for x in 0 ..< inputB.width {
                 for y in 0 ..< inputB.height {
                     if inputB[x, y].value   {
                         context.beginPath()
-                        let point = offset + Point(x,y) * scale
-                        context.addArc(center: point.cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi*2, clockwise: true)
-                        context.strokePath()
+                        let point = (offset + Point(x,y) * scale).rotated(around: center, by: -Double.pi / 2)
+
+                        context.addArc(center: point.cgPoint, radius: inputSize,
+                                       startAngle: CGFloat.pi * 1.0,
+                                       endAngle: CGFloat.pi * 2.0,
+                                       clockwise: false)
+                        context.fillPath()
                     }
                 }
+            }
+
+            context.setFillColor(CGColor(red: 1, green: 0, blue: 1, alpha: 1.0))
+            for strayPixel in strayPixelsB {
+
+                context.beginPath()
+                let point = (offset + Point(strayPixel.x,strayPixel.y) * scale).rotated(around: center, by: -Double.pi / 2)
+                context.addArc(center: point.cgPoint,
+                               radius: inputSize,
+                               startAngle: CGFloat.pi * 1.5,
+                               endAngle: CGFloat.pi  * 2.0,
+                               clockwise: false)
+                context.addLine(to: point.cgPoint)
+                context.fillPath()
             }
         }
 
@@ -211,7 +253,7 @@ class DisplayView: NSView {
 
         let hangAngle = Double.pi / 2 + angle
 
-        let center = offset + Point(inputA.width, inputA.height) / 2 * scale
+
 
 
         context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1.9))

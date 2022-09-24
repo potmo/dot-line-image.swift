@@ -11,7 +11,7 @@ struct PairwiseAlignment<T: Alignable> {
         let rows = trace[0].count;
         let cols = trace.count;
 
-        let gapExtensionCost = 0
+        let gapExtensionCost = 0.0
 
         let task = Task {
 
@@ -22,18 +22,18 @@ struct PairwiseAlignment<T: Alignable> {
             var curY: Int = 0
 
             while curX < cols && curY < rows {
-                var best = -1
+                var best = -1.0
                 var bestX = curX
                 var bestY = curY
                 for y in curY ..< rows {
-                    if s2[y].alignsWith(s1[curX]) && trace[curX][y] - max(0, (y - curY) * gapExtensionCost) > best {
+                    if s2[y].alignsWith(s1[curX]) && trace[curX][y] - max(0, Double(y - curY) * gapExtensionCost) >= best {
                         best = trace[curX][y]
                         bestX = curX
                         bestY = y
                     }
                 }
                 for x in curX ..< cols {
-                    if(s2[curY].alignsWith(s1[x]) && trace[x][curY] - max(0, (x - curX) * gapExtensionCost) > best) {
+                    if(s2[curY].alignsWith(s1[x]) && trace[x][curY] - max(0, Double(x - curX) * gapExtensionCost) >= best) {
                         best = trace[x][curY]
                         bestX = x
                         bestY = curY
@@ -89,7 +89,7 @@ struct PairwiseAlignment<T: Alignable> {
 
     }
 
-    func computeScoredData(s1: [T], s2: [T]) async -> [[Int]] {
+    func computeScoredData(s1: [T], s2: [T]) async -> [[Double]] {
         let data = await computeDirectMatches(s1: s1, s2: s2)
 
         let rows = data[0].count
@@ -101,7 +101,7 @@ struct PairwiseAlignment<T: Alignable> {
 
                 let currentValue = data[x][y];
 
-                let maxBelow: Int
+                let maxBelow: Double
 
                 if x + 1 < cols {
                     maxBelow = scored[x + 1][y + 1 ..< rows].max() ?? 0
@@ -109,7 +109,7 @@ struct PairwiseAlignment<T: Alignable> {
                     maxBelow = 0
                 }
 
-                let maxRight: Int
+                let maxRight: Double
                 if y + 1 < rows {
                     maxRight = scored[x + 1  ..< cols].map{$0[y + 1]}.max() ?? 0
                 } else {
@@ -126,50 +126,46 @@ struct PairwiseAlignment<T: Alignable> {
                 }
             }
         }
-        return scored;
+
+        //print(stringify(s1:s1, s2:s2, data: scored))
+        //print("")
+
+        return scored
     }
 
 
     // generate list of direct matches
-    func computeDirectMatches(s1: [T], s2: [T]) async -> [[Int]] {
+    func computeDirectMatches(s1: [T], s2: [T]) async -> [[Double]] {
         let columns = s1.count
         let rows = s2.count
-        var data = Array(repeating: Array(repeating: 0, count: rows), count: columns)
+        var data = Array(repeating: Array(repeating: 0.0, count: rows), count: columns)
 
         for y in 0 ..< rows {
             for x in 0 ..< columns {
-                if s1[x].alignsWith(s2[y]) {
-                    data[x][y] = 1
-                } else {
-                    data[x][y] = 0
-                }
+                data[x][y] = s1[x].alignmentScore(s2[y])
             }
         }
+
         return data;
     }
 
 
-    func stringify(s1: [T], s2: [T], data: [[Int]]) -> String {
-        var rows = ["  " + s1.map{"\($0)"}.joined(separator: "  ")]
+    func stringify(s1: [T], s2: [T], data: [[Double]]) -> String {
+        var rows = ["  " + s1.map{"\($0.printValue())".padding(toLength: 5, withPad: " ", startingAt: 0)}.joined(separator: "")]
         for y in 0 ..< data[0].count {
-            var row = "\(s2[y]) "
+            var row = "\(s2[y].printValue()) "
             for x in 0..<data.count {
                 let score = data[x][y]
-                if score <= 9 {
-                    row += "\(score)  "
-                }else {
-                    row += "\(score) "
-                }
-
+                row += score.string(2).padding(toLength: 5, withPad: " ", startingAt: 0)
             }
             rows.append(row)
         }
         return rows.joined(separator: "\n")
     }
-
-
 }
 
 protocol Alignable {
     func alignsWith(_ other: Self) -> Bool
+    func alignmentScore(_ other: Self) -> Double
+    func printValue() -> String
 }

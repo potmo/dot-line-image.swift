@@ -115,7 +115,6 @@ extension PixelImage where T == Bool {
 
 struct LabeledBool: Equatable, Alignable {
 
-
     let x: Int
     let y: Int
     let value: Bool
@@ -126,6 +125,21 @@ struct LabeledBool: Equatable, Alignable {
 
     func alignsWith(_ other: LabeledBool) -> Bool {
         return self.value && other.value
+    }
+
+    func alignmentScore(_ other: LabeledBool) -> Double {
+        switch (self.value, other.value) {
+            case (true, true):
+                return 1.0
+            case (false, false):
+                return 0.8
+            default:
+                return 0.5
+        }
+    }
+
+    func printValue() -> String {
+        return value ? "■" : "□"
     }
 }
 

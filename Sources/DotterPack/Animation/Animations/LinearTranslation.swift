@@ -4,7 +4,7 @@ import Foundation
 import simd
 import RealityKit
 
-struct LinearTransition: AnimationRig {
+struct LinearTranslation: AnimationRig {
 
     private let duration: Double
     private let startPositionProvider: () -> SIMD3<Float>
