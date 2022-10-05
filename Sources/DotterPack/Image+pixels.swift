@@ -47,7 +47,8 @@ struct PixelImage<T> {
     var matrix: [[T]] {
         return stride(from: 0, to: width, by: 1).map{ x in
             return stride(from: 0, to: height, by: 1).map{ y in
-                return self[x, y]
+                let index = y * width + x
+                return pixels[index]
             }
         }
     }
@@ -63,7 +64,7 @@ struct PixelImage<T> {
             for j in 0 ... k {
                 let i = k - j;
                 if( i < height && j < width ) {
-                    diagonal.append(matrix[i][j])
+                    diagonal.append(matrix[j][i])
                 }
             }
 
@@ -101,11 +102,26 @@ extension PixelImage where T == Pixel {
 
 extension PixelImage where T == Bool {
     func labeled() -> PixelImage<LabeledBool> {
+        /*
         let pixels = self.pixels.enumerated().map{ index, value in
             let (x, y) = self.getCoordinate(from: index)
             return LabeledBool(x: x, y: y, value: value)
         }
         return PixelImage<LabeledBool>(width: width, height: height, pixels: pixels)
+         */
+
+        var output: [LabeledBool] = Array(repeating: LabeledBool(x: 0, y: 0, value: false), count: pixels.count)
+
+        for x in 0 ..< width {
+            for y in 0 ..< height {
+                let index = y * width + x
+                let value = pixels[index]
+                output[index] = LabeledBool(x: x, y: y, value: value)
+            }
+        }
+
+        return PixelImage<LabeledBool>(width: width, height: height, pixels: output)
+
     }
 }
 
@@ -119,9 +135,9 @@ struct LabeledBool: Equatable, Alignable {
     let y: Int
     let value: Bool
 
-    static func == (lhs: LabeledBool, rhs: LabeledBool) -> Bool {
+    /*static func == (lhs: LabeledBool, rhs: LabeledBool) -> Bool {
         return lhs.value == rhs.value
-    }
+    }*/
 
     func alignsWith(_ other: LabeledBool) -> Bool {
         return self.value && other.value
@@ -140,6 +156,16 @@ struct LabeledBool: Equatable, Alignable {
 
     func printValue() -> String {
         return value ? "■" : "□"
+    }
+}
+
+extension Array where Element == LabeledBool {
+    var string: String {
+        return self.map{ pixel in
+            let x = "\(pixel.x)"
+            let y = "\(pixel.y)"
+            return "\(pixel.printValue())" + "(\(x), \(y))".leftPad(toLength: 8)
+        }.joined(separator: " ")
     }
 }
 

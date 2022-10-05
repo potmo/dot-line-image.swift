@@ -5,9 +5,10 @@ import SwiftUI
 struct Display: NSViewRepresentable {
     typealias NSViewType = DisplayView
 
-    init() {
-
-    }
+    @Binding var showDots: Bool
+    @Binding var showConnections: Bool
+    @Binding var showPoints: Bool
+    @Binding var showStrings: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -15,8 +16,14 @@ struct Display: NSViewRepresentable {
 
     func makeNSView(context: Context) -> DisplayView {
         let inputA = loadImage(name: "bergman").pixelImage()
-        let inputB = loadImage(name: "persson").pixelImage()
-        let view = DisplayView(parent: self, inputA: inputA, inputB: inputB)
+        let inputB = loadImage(name: "bergman").pixelImage()
+        let view = DisplayView(parent: self,
+                               imageA: inputA,
+                               imageB: inputB,
+                               showDots: $showDots,
+                               showConnections: $showConnections,
+                               showPoints: $showPoints,
+                               showStrings: $showStrings)
         return view
     }
 

@@ -5,8 +5,8 @@ struct PairwiseAlignment<T: Alignable> {
     // adapted from: https://github.com/preston/alignment
     // propbably https://en.wikipedia.org/wiki/Smith%E2%80%93Waterman_algorithm without gap opening and gap extension penanlties
 
-    func computeAlignment(s1: [T], s2: [T]) async -> ([T?], [T?]) {
-        let trace = await computeScoredData(s1: s1, s2: s2)
+    func computePairwiseAlignment(s1: [T], s2: [T]) async -> ([T?], [T?]) {
+        let trace = await computePairwiseAlignmentScoredData(s1: s1, s2: s2)
 
         let rows = trace[0].count;
         let cols = trace.count;
@@ -89,7 +89,7 @@ struct PairwiseAlignment<T: Alignable> {
 
     }
 
-    func computeScoredData(s1: [T], s2: [T]) async -> [[Double]] {
+    func computePairwiseAlignmentScoredData(s1: [T], s2: [T]) async -> [[Double]] {
         let data = await computeDirectMatches(s1: s1, s2: s2)
 
         let rows = data[0].count

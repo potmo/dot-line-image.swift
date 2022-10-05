@@ -7,6 +7,10 @@ struct Point {
     init(_ x: Double, _ y: Double) {
         self.x = x
         self.y = y
+
+        if x == Double.nan || y == Double.nan {
+            fatalError("trying to set nan")
+        }
     }
 
     init(_ x: Int, _ y: Int) {
@@ -22,6 +26,22 @@ struct Point {
         let nx = (cos * (point.x - pivot.x)) + (sin * (point.y - pivot.y)) + pivot.x
         let ny = (cos * (point.y - pivot.y)) - (sin * (point.x - pivot.x)) + pivot.y
         return Point(nx, ny)
+    }
+
+    func normalized() -> Point {
+        let length = self.length()
+        if length == 0 {
+            return Point(0,0)
+        }
+        return Point(x / length, y / length)
+    }
+
+    func length() -> Double {
+        return sqrt(x * x + y * y)
+    }
+
+    func negated() -> Point {
+        return Point(-x, -y)
     }
 
     static func +(lhs: Point, rhs: Point) -> Point {
@@ -54,6 +74,11 @@ struct Point {
 
 
     var cgPoint: CGPoint {
-        return CGPoint(x: x, y: y)
+        let point = CGPoint(x: x, y: y)
+
+        if point.x.isNaN || point.y.isNaN {
+            fatalError("point ends up NaN")
+        }
+        return point
     }
 }
