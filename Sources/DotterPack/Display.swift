@@ -9,21 +9,21 @@ struct Display: NSViewRepresentable {
     @Binding var showConnections: Bool
     @Binding var showPoints: Bool
     @Binding var showStrings: Bool
+    @Binding var showStrays: Bool
+
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
 
     func makeNSView(context: Context) -> DisplayView {
-        let inputA = loadImage(name: "bergman").pixelImage()
-        let inputB = loadImage(name: "bergman").pixelImage()
+
         let view = DisplayView(parent: self,
-                               imageA: inputA,
-                               imageB: inputB,
                                showDots: $showDots,
                                showConnections: $showConnections,
                                showPoints: $showPoints,
-                               showStrings: $showStrings)
+                               showStrings: $showStrings,
+                               showStrays: $showStrays )
         return view
     }
 
@@ -31,12 +31,7 @@ struct Display: NSViewRepresentable {
         canvasView.setNeedsDisplay(canvasView.bounds)
     }
 
-    func loadImage(name: String) -> NSImage {
-        guard let path = Bundle.module.path(forResource: name, ofType: "png"), let image = NSImage(contentsOfFile: path) else {
-            fatalError("Couldnt load image \(name).png")
-        }
-        return image
-    }
+ 
 
 
 }

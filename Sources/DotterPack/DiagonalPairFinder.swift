@@ -191,7 +191,7 @@ class DiagonalPairFinder {
         let unreachableB = Double(b.enumerated().filter{$0.offset < firstBlackA}.filter(\.element.value).count)
         let reachableB = Double(b.enumerated().filter{$0.offset >= firstBlackA}.filter(\.element.value).count)
 
-        let unreachablePenalty = (unreachableA + unreachableB) * Double(a.count) + Double(a.count - b.count) * 4
+        let unreachablePenalty = Double(a.count) * Double(a.count) * Double(a.count) + Double(a.count - b.count) * 4
         let totalDistance = distances.reduce(0, +)
         let score = totalDistance + unreachableA * unreachablePenalty + unreachableB * unreachablePenalty
 
