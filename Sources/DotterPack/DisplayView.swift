@@ -1,5 +1,6 @@
 import Cocoa
 import SwiftUI
+import AppKit
 
 class DisplayView: NSView {
 
@@ -17,12 +18,14 @@ class DisplayView: NSView {
     private var inputA: PixelImage<LabeledBool>
     private var inputB: PixelImage<LabeledBool>
     private var foundPivots: [Pivot]
+    private var foundPixelsA: [LabeledBool]
+    private var foundPixelsB: [LabeledBool]
     private var strayPixelsA: [LabeledBool]
     private var strayPixelsB: [LabeledBool]
     private var strayPivotsA: [Pivot]
     private var strayPivotsB: [Pivot]
 
-    private let scale: Double = 3
+    private let scale: Double = 6
 
 
     init(parent: Display,
@@ -40,10 +43,14 @@ class DisplayView: NSView {
 
 
         self.foundPivots = []
-        self.strayPixelsA = []
-        self.strayPixelsB = []
         self.strayPivotsA = []
         self.strayPivotsB = []
+        
+        self.foundPixelsA = []
+        self.foundPixelsB = []
+        self.strayPixelsA = []
+        self.strayPixelsB = []
+
 
 
 
@@ -68,8 +75,8 @@ class DisplayView: NSView {
         super.init(frame: NSRect(x: 0, y: 0, width: 1000, height: 1000))
 
 
-        self.inputA = loadImage(name: "bergman").pixelImage().floydSteinbergDithered().monochromed().labeled()
-        self.inputB = loadImage(name: "persson").pixelImage().floydSteinbergDithered().monochromed().rotatedCCW().labeled()
+        self.inputA = loadImage(name: "happy1").pixelImage().floydSteinbergDithered().monochromed().labeled()
+        self.inputB = loadImage(name: "happy2").pixelImage().floydSteinbergDithered().monochromed().rotatedCCW().labeled()
 
 
         print("inputA")
@@ -80,15 +87,41 @@ class DisplayView: NSView {
 
         print("//////////")
 
+
+
         let pairFinder = DiagonalPairFinder(diagonalsA: self.inputA.diagonals,
                                             diagonalsB: self.inputB.diagonals,
-                                            pivotFoundCallback: {self.foundPivots.append($0)},
-                                            strayAFoundCallback: self.addStrayPixelA(pixel:),
-                                            strayBFoundCallback: self.addStrayPixelB(pixel:))
+                                            pivotFoundCallback: self.addPivot,
+                                            strayAFoundCallback: self.addStrayPixelA,
+                                            strayBFoundCallback: self.addStrayPixelB,
+                                            doneCallback: self.findDependencies)
 
 
         pairFinder.start()
 
+    }
+
+    func findDependencies() {
+        let dependencyFinder = DependencyFinder()
+        let dependencies = dependencyFinder.solve(pivots: self.foundPivots)
+
+        for dependency in dependencies {
+            switch dependency {
+                case .root:
+                    print(dependency)
+                case .branch:
+                    continue
+                case .leaf:
+                    continue
+            }
+        }
+    }
+
+    func addPivot(pixelA: LabeledBool, pixelB: LabeledBool) {
+        let pivot = Pivot(pixelA, pixelB)
+        self.foundPixelsA.append(pixelA)
+        self.foundPixelsB.append(pixelB)
+        self.foundPivots.append(pivot)
     }
 
     func addStrayPixelA(pixel: LabeledBool) {
@@ -139,6 +172,14 @@ class DisplayView: NSView {
             return
         }
 
+
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .left
+
+        let attrs = [NSAttributedString.Key.font: NSFont(name: "HelveticaNeue-Thin", size: 12)!, NSAttributedString.Key.paragraphStyle: paragraphStyle]
+        let string = "pivots: \(foundPivots.count), strayA: \(strayPixelsA.count), strayB: \(strayPixelsB.count)"
+        string.draw(with: CGRect(x: 0, y: 0, width: 448, height: 40), options: .usesLineFragmentOrigin, attributes: attrs, context: nil)
+
         // flip y-axis so origin is in top left corner
         let flipVerticalTransform = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: self.frame.size.height)
         context.concatenate(flipVerticalTransform)
@@ -152,6 +193,7 @@ class DisplayView: NSView {
             context.addArc(center: mousePos, radius: 5, startAngle: 0, endAngle: CGFloat.pi*2, clockwise: true)
             context.strokePath()
         }
+
 
 
 
@@ -226,7 +268,7 @@ class DisplayView: NSView {
             for pivot in foundPivots {
 
                 let start = offset + pivot.dotPoint * scale
-                let end = (offset + pivot.posB * scale).rotated(around: center, by: -.pi / 2)
+                let end = (offset + pivot.pivotPoint * scale).rotated(around: center, by: -.pi / 2)
                 let arrow = (end - start).normalized().negated()
                 let arrowLeft = end + arrow.rotated(around: Point(0,0), by: .pi * 0.05) * scale * 0.2
                 let arrowRight = end + arrow.rotated(around: Point(0,0), by: -.pi * 0.05) * scale * 0.2
@@ -291,6 +333,61 @@ class DisplayView: NSView {
             }
         }
 
+
+       drawOriginals(context: context)
+
+    }
+
+    func drawOriginals(context: CGContext) {
+
+        let scale = 3.0
+        let offset = Point(50, 50)
+        let offsetA = Point(0, inputA.height) * scale + offset
+        let offsetB = Point(inputA.width, inputA.height) * scale + offset
+        let offsetC = Point(inputA.width, 0) * scale + offset
+
+        let bPivotPoint = Point(inputB.width, inputB.height) / 2
+
+        context.setStrokeColor(CGColor(red: 0, green: 0, blue: 1, alpha: 1))
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 1, alpha: 1))
+
+        for pixel in foundPixelsA.map(\.point) {
+            context.beginPath()
+            context.addArc(center: (offsetA + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
+            context.fillPath()
+        }
+
+        for pixel in foundPixelsB.map(\.point).map({$0.rotated(around: bPivotPoint, by: -.pi/2)}) {
+            context.beginPath()
+            context.addArc(center: (offsetB + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
+            context.fillPath()
+        }
+
+        for pixel in foundPixelsB.map(\.point) {
+            context.beginPath()
+            context.addArc(center: (offsetC + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
+            context.fillPath()
+        }
+
+        context.setStrokeColor(CGColor(red: 1, green: 0, blue: 1, alpha: 0.2))
+        context.setFillColor(CGColor(red: 1, green: 0, blue: 1, alpha: 0.2))
+        for pixel in strayPixelsA.map(\.point) {
+            context.beginPath()
+            context.addArc(center: (offsetA + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
+            context.fillPath()
+        }
+
+        for pixel in strayPixelsB.map(\.point).map({$0.rotated(around: bPivotPoint, by: -.pi/2)}) {
+            context.beginPath()
+            context.addArc(center: (offsetB + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
+            context.fillPath()
+        }
+
+        for pixel in strayPixelsB.map(\.point) {
+            context.beginPath()
+            context.addArc(center: (offsetC + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
+            context.fillPath()
+        }
     }
 
 

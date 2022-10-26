@@ -69,7 +69,7 @@ class PairwiseSequenceFinder {
         let blackPixelsB = pixelsB.filter{pixel in return pixel.value}
         let strayPixelsB = blackPixelsB.filter{ pixel in
             return !found.contains(where: { pivot in
-                Int(pivot.posB.x) == pixel.x && Int(pivot.posB.y) == pixel.y
+                Int(pivot.pivotPoint.x) == pixel.x && Int(pivot.pivotPoint.y) == pixel.y
             })
         }
 

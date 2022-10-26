@@ -14,13 +14,14 @@ let package = Package(
             targets: ["DotterPack"]),
     ],
     dependencies: [
-        // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
+        .package(url: "https://github.com/heckj/CameraControlARView", exact: Version(0, 5, 0))
     ],
     targets: [
         .executableTarget(
             name: "DotterPack",
-            dependencies: [],
+            dependencies: [
+                .product(name: "CameraControlARView", package: "CameraControlARView")
+            ],
             resources: [
                 .process("Resources"),
             ]),

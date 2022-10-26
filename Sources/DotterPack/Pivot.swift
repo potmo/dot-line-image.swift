@@ -1,8 +1,8 @@
 import Foundation
 
-struct Pivot {
+struct Pivot: Equatable {
     let dotPoint: Point
-    let posB: Point
+    let pivotPoint: Point
 
     var x: Double {
         return dotPoint.x
@@ -14,7 +14,7 @@ struct Pivot {
 
     var length: Double {
 
-        let l = dotPoint.y - posB.y
+        let l = dotPoint.y - pivotPoint.y
 
         //guard l >= 0 else { fatalError("pixel is upside down") }
 
@@ -24,12 +24,12 @@ struct Pivot {
 
     init(pivotPoint: Point, dotPoint: Point) {
         self.dotPoint = dotPoint
-        self.posB = pivotPoint
+        self.pivotPoint = pivotPoint
     }
 
     init(posA: Point, posB: Point) {
         self.dotPoint = posA
-        self.posB = posB
+        self.pivotPoint = posB
     }
 
     init(_ labelA: LabeledBool, _ labelB: LabeledBool) {

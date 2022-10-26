@@ -1,6 +1,6 @@
 import Foundation
 
-struct Point {
+struct Point: Equatable {
     let x: Double
     let y: Double
 
@@ -17,6 +17,17 @@ struct Point {
         self.x = Double(x)
         self.y = Double(y)
     }
+
+    init(_ x: Double, _ y: Int) {
+        self.x = x
+        self.y = Double(y)
+    }
+
+    init(_ x: Int, _ y: Double) {
+        self.x = Double(x)
+        self.y = y
+    }
+
 
     func rotated(around pivot: Point, by radians: Double) -> Point{
         let point = self
@@ -42,6 +53,14 @@ struct Point {
 
     func negated() -> Point {
         return Point(-x, -y)
+    }
+
+    func distanceTo(_ other: Point) -> Double {
+        return sqrt(pow(other.x - self.x, 2) + pow(other.y - self.y, 2))
+    }
+
+    func distanceSquaredTo(_ other: Point) -> Double {
+        return pow(other.x - self.x, 2) + pow(other.y - self.y, 2)
     }
 
     static func +(lhs: Point, rhs: Point) -> Point {

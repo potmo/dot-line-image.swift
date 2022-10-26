@@ -9,23 +9,26 @@ import Foundation
 
 class DiagonalPairFinder {
 
-    private var pivotFoundCallback: (Pivot) -> Void
-    private var strayAFoundCallback: (LabeledBool) -> Void
-    private var strayBFoundCallback: (LabeledBool) -> Void
+    private let pivotFoundCallback: (LabeledBool, LabeledBool) -> Void
+    private let strayAFoundCallback: (LabeledBool) -> Void
+    private let strayBFoundCallback: (LabeledBool) -> Void
+    private let doneCallback: () -> Void
 
     private let diagonalsA: [[LabeledBool]]
     private let diagonalsB: [[LabeledBool]]
 
     init(diagonalsA: [[LabeledBool]],
          diagonalsB: [[LabeledBool]],
-         pivotFoundCallback: @escaping (Pivot) -> Void,
+         pivotFoundCallback: @escaping (LabeledBool, LabeledBool) -> Void,
          strayAFoundCallback: @escaping (LabeledBool) -> Void,
-         strayBFoundCallback: @escaping (LabeledBool) -> Void) {
+         strayBFoundCallback: @escaping (LabeledBool) -> Void,
+         doneCallback: @escaping () -> Void ) {
         self.diagonalsA = diagonalsA
         self.diagonalsB = diagonalsB
         self.pivotFoundCallback = pivotFoundCallback
         self.strayAFoundCallback = strayAFoundCallback
         self.strayBFoundCallback = strayBFoundCallback
+        self.doneCallback = doneCallback
 
     }
 
@@ -34,6 +37,7 @@ class DiagonalPairFinder {
     func start() {
         Task {
             computeDiagonalPairs(diagonalsA: diagonalsA, diagonalsB: diagonalsB)
+            doneCallback()
         }
     }
 
@@ -81,9 +85,9 @@ class DiagonalPairFinder {
 
             let pixelB = nonTakenCandiates.first!
             // take the last candidate
-            let pivot = Pivot(pixelA, pixelB)
+
             //print("connect with (\(pixelB.x), \(pixelB.y))")
-            pivotFoundCallback(pivot)
+            pivotFoundCallback(pixelA, pixelB)
             takenInB.append(pixelB)
         }
 
@@ -94,6 +98,28 @@ class DiagonalPairFinder {
 
         //print("------")
 
+    }
+
+    private func computeDiagonalPairs3(labelsA: [LabeledBool], labelsB: [LabeledBool]) {
+
+
+        var aAdded: [LabeledBool] = []
+        var bAdded: [LabeledBool] = []
+
+        for (aIndex, a) in labelsA.enumerated() {
+            for b in labelsB[aIndex...] {
+                if a.value && b.value {
+                    pivotFoundCallback(a, b)
+                    aAdded.append(a)
+                    bAdded.append(b)
+                    break
+                }
+            }
+        }
+
+
+        labelsA.filter(\.value).filter{ !aAdded.contains($0)}.forEach(self.strayAFoundCallback)
+        labelsB.filter(\.value).filter{ !bAdded.contains($0)}.forEach(self.strayBFoundCallback)
     }
 
 
@@ -125,8 +151,7 @@ class DiagonalPairFinder {
 
                 if aPixel.value && bPixel.value {
 
-                    let pivot = Pivot(aPixel, bPixel)
-                    pivotFoundCallback(pivot)
+                    pivotFoundCallback(aPixel, bPixel)
 
                     // take it
                     a[aIndex] = LabeledBool(x: aPixel.x, y: aPixel.y, value: false)

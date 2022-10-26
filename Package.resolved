@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "cameracontrolarview",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/heckj/CameraControlARView",
+      "state" : {
+        "revision" : "ede86905181f429d2749cda87275ce498ec9f072",
+        "version" : "0.5.0"
+      }
+    }
+  ],
+  "version" : 2
+}

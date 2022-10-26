@@ -157,6 +157,14 @@ struct LabeledBool: Equatable, Alignable {
     func printValue() -> String {
         return value ? "■" : "□"
     }
+
+    var cgPoint: CGPoint {
+        return CGPoint(x: x, y: y)
+    }
+
+    var point: Point {
+        return Point(x, y)
+    }
 }
 
 extension Array where Element == LabeledBool {
