@@ -13,7 +13,7 @@ struct DependencyFinder {
         }
 
 
-        let roots = nodes.filter(\.parents.isEmpty)
+        var roots = nodes.filter(\.parents.isEmpty)
 
         roots.forEach{ root in root.depth = 0}
 
@@ -44,39 +44,35 @@ struct DependencyFinder {
         }
 
         var dependencies: [Int: Dependency] = [:]
-        for root in nodes.filter({$0.parents.isEmpty}) {
-            dependencies = createDependency(node: root, previous: dependencies)
+        roots = nodes.filter(\.parents.isEmpty)
+        for (rootId, root) in roots.enumerated() {
+            createDependency(node: root, dependencies: &dependencies, rootId: rootId, depth: 0)
         }
 
-
-        return Array(dependencies.values)
+        return dependencies.values.map({$0})
     }
 
-    func createDependency(node: TempDependency, previous: [Int: Dependency]) -> [Int: Dependency] {
+    func createDependency(node: TempDependency, dependencies: inout [Int: Dependency], rootId: Int, depth: Int) {
 
-        if previous.keys.contains(node.id) {
-            return previous
+        if dependencies.keys.contains(node.id) {
+            return
         }
 
-        var current = previous
-
         for child in node.children {
-            current = createDependency(node: child, previous: current)
+            createDependency(node: child, dependencies: &dependencies, rootId: rootId, depth: depth + 1)
         }
 
         if node.children.isEmpty {
-            current[node.id] = .leaf(depth: node.depth!, pivot: node.pivot)
+            dependencies[node.id] = .leaf(depth: depth, pivot: node.pivot, rootId: rootId)
         }
 
-        let childNodes = node.children.map(\.id).map{ current[$0]! }
+        let childNodes = node.children.map(\.id).map{ dependencies[$0]! }
 
         if node.parents.isEmpty {
-            current[node.id] = .root(depth: node.depth!, pivot: node.pivot, children: childNodes)
+            dependencies[node.id] = .root(depth: depth, pivot: node.pivot, children: childNodes, rootId: rootId)
         }else{
-            current[node.id] = .branch(depth: node.depth!, pivot: node.pivot, children: childNodes)
+            dependencies[node.id] = .branch(depth: depth, pivot: node.pivot, children: childNodes, rootId: rootId)
         }
-
-        return current
 
     }
 
@@ -94,8 +90,8 @@ struct DependencyFinder {
             let distanceSquared = node.point.distanceSquaredTo(otherNode.point)
 
             if distanceSquared <= otherNode.lengthSquared {
-                node.parents.append(otherNode)
-                otherNode.children.append(node)
+                node.children.append(otherNode)
+                otherNode.parents.append(node)
             }
         }
     }
@@ -167,7 +163,85 @@ class TempDependency: Equatable, Hashable, CustomStringConvertible {
 }
 
 enum Dependency {
-    case root(depth: Int, pivot: Pivot, children: [Dependency])
-    case branch(depth: Int, pivot: Pivot, children: [Dependency])
-    case leaf(depth: Int, pivot: Pivot)
+    case root(depth: Int, pivot: Pivot, children: [Dependency], rootId: Int)
+    case branch(depth: Int, pivot: Pivot, children: [Dependency], rootId: Int)
+    case leaf(depth: Int, pivot: Pivot, rootId: Int)
+
+    var isRoot: Bool {
+        switch self {
+            case .root: return true
+            default: return false
+        }
+    }
+
+    var isLeaf: Bool {
+        switch self {
+            case .leaf: return true
+            default: return false
+        }
+    }
+
+    var isBranch:  Bool {
+        switch self {
+            case .branch: return true
+            default: return false
+        }
+    }
+
+    var children: [Dependency] {
+        switch self {
+            case .root(_, _, let children, _):
+                return children
+            case .branch(_, _, let children, _):
+                return children
+            case .leaf(_, _, _):
+                return []
+        }
+    }
+
+    var allChildren: [Dependency] {
+        switch self {
+            case .root(_, _, let children, _):
+                return children.flatMap(\.allChildren)
+            case .branch(_, _, let children, _):
+                return children.flatMap(\.allChildren)
+            case .leaf(_, _, _):
+                return []
+        }
+    }
+
+    var pivot: Pivot {
+        switch self {
+            case .root(_, let pivot, _, _):
+                return pivot
+            case .branch(_, let pivot, _, _):
+                return pivot
+            case .leaf(_, let pivot, _):
+                return pivot
+        }
+    }
+
+    var depth: Int {
+        switch self {
+            case .root(let depth, _, _, _):
+                return depth
+            case .branch(let depth, _, _, _):
+                return depth
+            case .leaf(let depth, _, _):
+                return depth
+        }
+    }
+
+    var rootId: Int {
+        switch self {
+            case .root(_,_,_, let rootId):
+                return rootId
+            case .branch(_,_,_, let rootId):
+                return rootId
+            case .leaf(_,_, let rootId):
+                return rootId
+        }
+    }
+
+
 }

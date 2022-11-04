@@ -1,6 +1,6 @@
 import Foundation
 
-struct Point: Equatable {
+struct Point: Equatable, Hashable {
     let x: Double
     let y: Double
 
@@ -26,6 +26,11 @@ struct Point: Equatable {
     init(_ x: Int, _ y: Double) {
         self.x = Double(x)
         self.y = y
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(x)
+        hasher.combine(y)
     }
 
 

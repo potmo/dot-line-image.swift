@@ -9,150 +9,16 @@ class DisplayView: NSView {
 
     var parent: Display!
 
-    @Binding var showDots: Bool
-    @Binding var showConnections: Bool
-    @Binding var showPoints: Bool
-    @Binding var showStrings: Bool
-    @Binding var showStrays: Bool
-
-    private var inputA: PixelImage<LabeledBool>
-    private var inputB: PixelImage<LabeledBool>
-    private var foundPivots: [Pivot]
-    private var foundPixelsA: [LabeledBool]
-    private var foundPixelsB: [LabeledBool]
-    private var strayPixelsA: [LabeledBool]
-    private var strayPixelsB: [LabeledBool]
-    private var strayPivotsA: [Pivot]
-    private var strayPivotsB: [Pivot]
+    @ObservedObject var state: ObservableState
 
     private let scale: Double = 6
 
 
-    init(parent: Display,
-         showDots: Binding<Bool>,
-         showConnections: Binding<Bool>,
-         showPoints: Binding<Bool>,
-         showStrings: Binding<Bool>,
-         showStrays: Binding<Bool>) {
+    init(state: ObservableState) {
 
-        self._showDots = showDots
-        self._showConnections = showConnections
-        self._showPoints = showPoints
-        self._showStrings = showStrings
-        self._showStrays = showStrays
+        self.state = state
 
-
-        self.foundPivots = []
-        self.strayPivotsA = []
-        self.strayPivotsB = []
-        
-        self.foundPixelsA = []
-        self.foundPixelsB = []
-        self.strayPixelsA = []
-        self.strayPixelsB = []
-
-
-
-
-        var generator = RandomNumberGeneratorWithSeed(seed: 23232)
-        let size = 30
-
-        //Bool.random(using: &generator)
-
-        self.inputA = PixelImage<LabeledBool>(width: size, height: size, pixels: stride(from: 0, to: size, by: 1).map{ y in
-            return stride(from: 0, to: size, by: 1).map{ x in
-                return LabeledBool(x: x, y: y, value: (y + x).isMultiple(of: 2))
-            }
-        }.flatMap{$0})
-
-        self.inputB = PixelImage<LabeledBool>(width: size, height: size, pixels: stride(from: 0, to: size, by: 1).map{ y in
-            return stride(from: 0, to: size, by: 1).map{ x in
-                return LabeledBool(x: x, y: y, value: (y + x).isMultiple(of: 2))
-            }
-        }.flatMap{$0})
-
-
-        super.init(frame: NSRect(x: 0, y: 0, width: 1000, height: 1000))
-
-
-        self.inputA = loadImage(name: "happy1").pixelImage().floydSteinbergDithered().monochromed().labeled()
-        self.inputB = loadImage(name: "happy2").pixelImage().floydSteinbergDithered().monochromed().rotatedCCW().labeled()
-
-
-        print("inputA")
-        printMatrix(self.inputA.matrix) { $0.value ? "■" : "□"}
-
-        print("inputB")
-        printMatrix(self.inputB.matrix) { $0.value ? "■" : "□"}
-
-        print("//////////")
-
-
-
-        let pairFinder = DiagonalPairFinder(diagonalsA: self.inputA.diagonals,
-                                            diagonalsB: self.inputB.diagonals,
-                                            pivotFoundCallback: self.addPivot,
-                                            strayAFoundCallback: self.addStrayPixelA,
-                                            strayBFoundCallback: self.addStrayPixelB,
-                                            doneCallback: self.findDependencies)
-
-
-        pairFinder.start()
-
-    }
-
-    func findDependencies() {
-        let dependencyFinder = DependencyFinder()
-        let dependencies = dependencyFinder.solve(pivots: self.foundPivots)
-
-        for dependency in dependencies {
-            switch dependency {
-                case .root:
-                    print(dependency)
-                case .branch:
-                    continue
-                case .leaf:
-                    continue
-            }
-        }
-    }
-
-    func addPivot(pixelA: LabeledBool, pixelB: LabeledBool) {
-        let pivot = Pivot(pixelA, pixelB)
-        self.foundPixelsA.append(pixelA)
-        self.foundPixelsB.append(pixelB)
-        self.foundPivots.append(pivot)
-    }
-
-    func addStrayPixelA(pixel: LabeledBool) {
-        self.strayPixelsA.append(pixel)
-        self.strayPivotsA.append(Pivot(pixel, LabeledBool(x: pixel.x, y: -pixel.x, value: true)))
-    }
-
-    func addStrayPixelB(pixel: LabeledBool) {
-        self.strayPixelsB.append(pixel)
-
-        let pixelPoint = Point(pixel.x, pixel.y)
-
-        let pivotPoint = Point(-pixelPoint.y,  pixelPoint.y)
-        let dotPoint = Point(pivotPoint.x, pivotPoint.y + pixelPoint.x + pixelPoint.y)
-
-        self.strayPivotsB.append(Pivot(pivotPoint: pivotPoint, dotPoint: dotPoint))
-    }
-
-    func printMatrix<T>(_ matrix: [[T]], printer: (T)->String) {
-        for y in 0 ..< matrix[0].count {
-            var row = ""
-            for x in 0 ..< matrix.count {
-                let val = matrix[x][y]
-                row += printer(val)
-            }
-            print(row)
-        }
-    }
-
-    func printArray<T>(_ array: [T], printer: (T) -> String) {
-        print(array.map(printer).joined())
+        super.init(frame: .zero)
     }
 
 
@@ -177,7 +43,7 @@ class DisplayView: NSView {
         paragraphStyle.alignment = .left
 
         let attrs = [NSAttributedString.Key.font: NSFont(name: "HelveticaNeue-Thin", size: 12)!, NSAttributedString.Key.paragraphStyle: paragraphStyle]
-        let string = "pivots: \(foundPivots.count), strayA: \(strayPixelsA.count), strayB: \(strayPixelsB.count)"
+        let string = "pivots: \(state.foundPivots.count), strayA: \(state.strayPixelsA.count), strayB: \(state.strayPixelsB.count)"
         string.draw(with: CGRect(x: 0, y: 0, width: 448, height: 40), options: .usesLineFragmentOrigin, attributes: attrs, context: nil)
 
         // flip y-axis so origin is in top left corner
@@ -198,15 +64,15 @@ class DisplayView: NSView {
 
 
         let inputSize:CGFloat = 0.2 * scale
-        let offset = Point( Double(self.bounds.midX), Double(self.bounds.midX)) - Point(inputA.width, inputA.height) / 2 * scale
-        let center = offset + Point(inputA.width, inputA.height) / 2 * scale
+        let offset = Point( Double(self.bounds.midX), Double(self.bounds.midX)) - Point(state.inputA.width, state.inputA.height) / 2 * scale
+        let center = offset + Point(state.inputA.width, state.inputA.height) / 2 * scale
 
-        if showPoints {
+        if state.showPoints {
             context.setFillColor(CGColor(red: 0.4, green: 0.4, blue: 1, alpha: 1.0))
             
-            for x in 0 ..< inputA.width {
-                for y in 0 ..< inputA.height {
-                    if inputA[x,y].value {
+            for x in 0 ..< state.inputA.width {
+                for y in 0 ..< state.inputA.height {
+                    if state.inputA[x,y].value {
                         context.beginPath()
                         context.addArc(center: (offset + Point(x,y) * scale).cgPoint,
                                        radius: inputSize,
@@ -219,7 +85,7 @@ class DisplayView: NSView {
             }
 
             context.setFillColor(CGColor(red: 0, green: 0, blue: 0.5, alpha: 1.0))
-            for strayPixel in strayPixelsA {
+            for strayPixel in state.strayPixelsA {
 
                 context.beginPath()
                 context.addArc(center: (offset + Point(strayPixel.x,strayPixel.y) * scale).cgPoint,
@@ -233,9 +99,9 @@ class DisplayView: NSView {
             
             context.setFillColor(CGColor(red: 0.5, green: 1, blue: 0.5, alpha: 1.0))
             
-            for x in 0 ..< inputB.width {
-                for y in 0 ..< inputB.height {
-                    if inputB[x, y].value   {
+            for x in 0 ..< state.inputB.width {
+                for y in 0 ..< state.inputB.height {
+                    if state.inputB[x, y].value   {
                         context.beginPath()
                         let point = (offset + Point(x,y) * scale).rotated(around: center, by: -Double.pi / 2)
 
@@ -249,7 +115,7 @@ class DisplayView: NSView {
             }
 
             context.setFillColor(CGColor(red: 0, green: 0.5, blue: 0, alpha: 1.0))
-            for strayPixel in strayPixelsB {
+            for strayPixel in state.strayPixelsB {
 
                 context.beginPath()
                 let point = (offset + Point(strayPixel.x,strayPixel.y) * scale).rotated(around: center, by: -Double.pi / 2)
@@ -264,8 +130,8 @@ class DisplayView: NSView {
         }
 
 
-        if showConnections {
-            for pivot in foundPivots {
+        if state.showConnections {
+            for pivot in state.foundPivots {
 
                 let start = offset + pivot.dotPoint * scale
                 let end = (offset + pivot.pivotPoint * scale).rotated(around: center, by: -.pi / 2)
@@ -288,21 +154,21 @@ class DisplayView: NSView {
 
 
 
-        let angle: Double
+        let angle: Double = state.rotation
 
-        if let mousePos {
-            angle = (mousePos.y / Double(frame.height) * Double.pi * 4)
-        } else {
-            angle = 0
-        }
+//        if let mousePos {
+//            angle = (mousePos.y / Double(frame.height) * Double.pi * 4)
+//        } else {
+//            angle = 0
+//        }
 
         context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1.9))
         context.beginPath()
         context.addArc(center: center.cgPoint, radius: 300, startAngle: 0 - angle, endAngle: CGFloat.pi - angle, clockwise: true)
         context.strokePath()
 
-        if showDots {
-            for pivot in foundPivots {
+        if state.showDots {
+            for pivot in state.foundPivots {
 
               drawPivot(pivot,
                         to: context,
@@ -312,8 +178,8 @@ class DisplayView: NSView {
                         angle: angle)
             }
 
-            if showStrays {
-                for pivot in strayPivotsA {
+            if state.showStrays {
+                for pivot in state.strayPivotsA {
                     drawPivot(pivot,
                               to: context,
                               with: CGColor(red: 1, green: 0, blue: 0, alpha: 1.0),
@@ -322,7 +188,7 @@ class DisplayView: NSView {
                               angle: angle)
                 }
 
-                for pivot in strayPivotsB {
+                for pivot in state.strayPivotsB {
                     drawPivot(pivot,
                               to: context,
                               with: CGColor(red: 1, green: 0, blue: 0, alpha: 1.0),
@@ -342,28 +208,28 @@ class DisplayView: NSView {
 
         let scale = 3.0
         let offset = Point(50, 50)
-        let offsetA = Point(0, inputA.height) * scale + offset
-        let offsetB = Point(inputA.width, inputA.height) * scale + offset
-        let offsetC = Point(inputA.width, 0) * scale + offset
+        let offsetA = Point(0, state.inputA.height) * scale + offset
+        let offsetB = Point(state.inputA.width, state.inputA.height) * scale + offset
+        let offsetC = Point(state.inputA.width, 0) * scale + offset
 
-        let bPivotPoint = Point(inputB.width, inputB.height) / 2
+        let bPivotPoint = Point(state.inputB.width, state.inputB.height) / 2
 
         context.setStrokeColor(CGColor(red: 0, green: 0, blue: 1, alpha: 1))
         context.setFillColor(CGColor(red: 0, green: 0, blue: 1, alpha: 1))
 
-        for pixel in foundPixelsA.map(\.point) {
+        for pixel in state.foundPixelsA.map(\.point) {
             context.beginPath()
             context.addArc(center: (offsetA + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
             context.fillPath()
         }
 
-        for pixel in foundPixelsB.map(\.point).map({$0.rotated(around: bPivotPoint, by: -.pi/2)}) {
+        for pixel in state.foundPixelsB.map(\.point).map({$0.rotated(around: bPivotPoint, by: -.pi/2)}) {
             context.beginPath()
             context.addArc(center: (offsetB + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
             context.fillPath()
         }
 
-        for pixel in foundPixelsB.map(\.point) {
+        for pixel in state.foundPixelsB.map(\.point) {
             context.beginPath()
             context.addArc(center: (offsetC + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
             context.fillPath()
@@ -371,19 +237,19 @@ class DisplayView: NSView {
 
         context.setStrokeColor(CGColor(red: 1, green: 0, blue: 1, alpha: 0.2))
         context.setFillColor(CGColor(red: 1, green: 0, blue: 1, alpha: 0.2))
-        for pixel in strayPixelsA.map(\.point) {
+        for pixel in state.strayPixelsA.map(\.point) {
             context.beginPath()
             context.addArc(center: (offsetA + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
             context.fillPath()
         }
 
-        for pixel in strayPixelsB.map(\.point).map({$0.rotated(around: bPivotPoint, by: -.pi/2)}) {
+        for pixel in state.strayPixelsB.map(\.point).map({$0.rotated(around: bPivotPoint, by: -.pi/2)}) {
             context.beginPath()
             context.addArc(center: (offsetB + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
             context.fillPath()
         }
 
-        for pixel in strayPixelsB.map(\.point) {
+        for pixel in state.strayPixelsB.map(\.point) {
             context.beginPath()
             context.addArc(center: (offsetC + pixel * scale).cgPoint, radius: 1, startAngle: 0, endAngle: CGFloat.pi * 2, clockwise: true)
             context.fillPath()
@@ -402,7 +268,7 @@ class DisplayView: NSView {
         let pivotPointRotated = pivotPoint.rotated(around: center, by: angle)
         let tipPointRotated = tipPoint.rotated(around: center, by: angle)
 
-        if showStrings {
+        if state.showStrings {
             context.setStrokeColor(CGColor(red: 0, green: 0, blue: 0, alpha: 0.1))
             context.beginPath()
             context.addArc(center: pivotPointRotated.cgPoint, radius: 0.2, startAngle: 0, endAngle: CGFloat.pi*2, clockwise: true)
@@ -531,11 +397,6 @@ class DisplayView: NSView {
 
     }
 
-    func loadImage(name: String) -> NSImage {
-        guard let path = Bundle.module.path(forResource: name, ofType: "png"), let image = NSImage(contentsOfFile: path) else {
-            fatalError("Couldnt load image \(name).png")
-        }
-        return image
-    }
+
 
 }

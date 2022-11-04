@@ -4,12 +4,8 @@ import SwiftUI
 
 struct Display: NSViewRepresentable {
     typealias NSViewType = DisplayView
-
-    @Binding var showDots: Bool
-    @Binding var showConnections: Bool
-    @Binding var showPoints: Bool
-    @Binding var showStrings: Bool
-    @Binding var showStrays: Bool
+    
+    @ObservedObject var state: ObservableState
 
 
     func makeCoordinator() -> Coordinator {
@@ -18,12 +14,8 @@ struct Display: NSViewRepresentable {
 
     func makeNSView(context: Context) -> DisplayView {
 
-        let view = DisplayView(parent: self,
-                               showDots: $showDots,
-                               showConnections: $showConnections,
-                               showPoints: $showPoints,
-                               showStrings: $showStrings,
-                               showStrays: $showStrays )
+        let view = DisplayView(state: state)
+
         return view
     }
 

@@ -4,50 +4,69 @@ import CameraControlARView
 struct ContentView: View {
 
 
-    @State var showDots = true
-    @State var showConnections = false
-    @State var showPoints = false
-    @State var showStrings = true
-    @State var showStrays = false
-    @State var show3d = false
+    @StateObject var state: ObservableState
 
-    @State var inputA: PixelImage<LabeledBool>
-    @State var inputB: PixelImage<LabeledBool>
-    @State var foundPivots: [Pivot] = []
-    @State var foundPixelsA: [LabeledBool] = []
-    @State var foundPixelsB: [LabeledBool] = []
-    @State var strayPixelsA: [LabeledBool] = []
-    @State var strayPixelsB: [LabeledBool] = []
-    @State var strayPivotsA: [Pivot] = []
-    @State var strayPivotsB: [Pivot] = []
+    @State var solver: Solver?
 
     init() {
+        //var generator = RandomNumberGeneratorWithSeed(seed: 23232)
+        //let size = 30
+        //Bool.random(using: &generator)
+        let size = 30
 
+        var inputA: PixelImage<LabeledBool>
+        var inputB: PixelImage<LabeledBool>
+
+        inputA = PixelImage<LabeledBool>(width: size, height: size, pixels: stride(from: 0, to: size, by: 1).map{ y in
+            return stride(from: 0, to: size, by: 1).map{ x in
+                return LabeledBool(x: x, y: y, value: (y + x).isMultiple(of: 2))
+            }
+        }.flatMap{$0})
+
+        inputB = PixelImage<LabeledBool>(width: size, height: size, pixels: stride(from: 0, to: size, by: 1).map{ y in
+            return stride(from: 0, to: size, by: 1).map{ x in
+                return LabeledBool(x: x, y: y, value: (y + x).isMultiple(of: 2))
+            }
+        }.flatMap{$0})
+
+        inputA = Self.loadImage(name: "happy1").pixelImage().floydSteinbergDithered().monochromed().labeled()
+        inputB = Self.loadImage(name: "happy2").pixelImage().floydSteinbergDithered().monochromed().rotatedCCW().labeled()
+
+        self._state = StateObject(wrappedValue: ObservableState(inputA: inputA, inputB: inputB))
+
+    }
+
+    private static func loadImage(name: String) -> NSImage {
+        guard let path = Bundle.module.path(forResource: name, ofType: "png"), let image = NSImage(contentsOfFile: path) else {
+            fatalError("Couldnt load image \(name).png")
+        }
+        return image
     }
 
     var body: some View {
         ZStack(alignment: .topLeading){
 
-            if show3d {
-                Display(showDots: $showDots,
-                        showConnections: $showConnections,
-                        showPoints: $showPoints,
-                        showStrings: $showStrings,
-                        showStrays: $showStrays)
+            if state.show3d {
+                Content3d(state: state)
             } else {
-                Content3d()
+                Display(state: state)
             }
 
             HStack{
-                Button("Toggle dots"){ showDots.toggle()}.foregroundColor( showDots ? .green : .red )
-                Button("Toggle connections"){ showConnections.toggle()}.foregroundColor( showConnections ? .green : .red )
-                Button("Toggle points"){ showPoints.toggle()}.foregroundColor( showPoints ? .green : .red )
-                Button("Toggle strings"){ showStrings.toggle()}.foregroundColor( showStrings ? .green : .red )
-                Button("Toggle strays"){ showStrays.toggle()}.foregroundColor( showStrays ? .green : .red )
-                Button("Toggle 3d"){ show3d.toggle()}.foregroundColor( show3d ? .green : .red )
+                Button("Toggle dots"){ state.showDots.toggle()}.foregroundColor( state.showDots ? .green : .red )
+                Button("Toggle connections"){ state.showConnections.toggle()}.foregroundColor( state.showConnections ? .green : .red )
+                Button("Toggle points"){ state.showPoints.toggle()}.foregroundColor( state.showPoints ? .green : .red )
+                Button("Toggle strings"){ state.showStrings.toggle()}.foregroundColor( state.showStrings ? .green : .red )
+                Button("Toggle strays"){ state.showStrays.toggle()}.foregroundColor( state.showStrays ? .green : .red )
+                Button("Toggle 3d"){ state.show3d.toggle()}.foregroundColor( state.show3d ? .green : .red )
+                Slider(value: $state.rotation, in: -Double.pi/2...(-Double.pi/2+Double.pi/2))
+
             }.padding()
         }
         .background(.white)
+        .onAppear{
+            self.solver = Solver(state: state)
+        }
 
     }
 }
